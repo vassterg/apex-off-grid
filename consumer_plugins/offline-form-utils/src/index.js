@@ -81,6 +81,8 @@ async function _fillForm({ storageId, storageVersion, pkPageItem }) {
       pageItem.setValue(row[col.colname]);
     }
   }
+
+  apex.page.cancelWarnOnUnsavedChanges();
 }
 
 async function getRow({
@@ -135,6 +137,7 @@ async function _create({ storageId, storageVersion, pkPageItem }) {
   await window.hartenfeller_dev.plugins.sync_offline_data.storages[
     storageKey
   ].writeChanges([row]);
+  apex.page.cancelWarnOnUnsavedChanges();
 
   showSuccessMessage('Record created successfully!');
 }
@@ -154,6 +157,7 @@ async function _update({ storageId, storageVersion, pkPageItem }) {
   await window.hartenfeller_dev.plugins.sync_offline_data.storages[
     storageKey
   ].writeChanges([row]);
+  apex.page.cancelWarnOnUnsavedChanges();
 
   showSuccessMessage('Record updated successfully!');
 }
@@ -173,6 +177,7 @@ async function _delete({ storageId, storageVersion, pkPageItem }) {
   await window.hartenfeller_dev.plugins.sync_offline_data.storages[
     storageKey
   ].writeChanges([row]);
+  apex.page.cancelWarnOnUnsavedChanges();
 
   showSuccessMessage('Record deleted successfully!');
 }
