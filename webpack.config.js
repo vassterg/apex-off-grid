@@ -22,4 +22,5 @@ export default {
       patterns: [{ from: '**/jswasm/*', to: 'dist' }],
     }),
   ],
+  target: "browserslist"
 };
