@@ -30,6 +30,11 @@
   let options;
   let table;
 
+  export async function refresh() {
+    apex.debug.trace("Refresh p-offline-table");
+    return requestData();
+  }
+
   async function requestData() {
     const args = {
       maxRows: pageSize,
