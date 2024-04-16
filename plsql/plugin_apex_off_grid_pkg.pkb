@@ -570,7 +570,7 @@ create or replace package body plugin_apex_off_grid_pkg as
                                   apex_javascript.add_attribute( p_name => 'storageVersion', p_value => l_storage_version ) ||
                                   apex_javascript.add_attribute( p_name => 'pkPageItem', p_value => l_pk_item ) ||
                                   apex_javascript.add_attribute( p_name => 'regionId', p_value => p_plugin.attribute_01 ) ||
-                                  '})  }';
+                                  '}, this)  }';
 
     return l_return;
   end render_form_utils_da;
