@@ -1,4 +1,8 @@
 export async function cachePageByUrl(url: string ) {
+  if (!navigator.onLine) {
+    window.apex.debug.trace('offline, skipping cache page');
+    return;
+  }
   const response = await fetch(url);
 
   // if valid response
@@ -69,6 +73,10 @@ export async function cachAppPagesOldSyntax(pageIds: number[]) {
  * @param pageNames Array of page names to cache
  */
 export async function cachAppPages(pageNames: string[]) {
+  if (!navigator.onLine) {
+    window.apex.debug.trace('offline, skipping cache page');
+    return;
+  }
   const url = window.location.href;
   const split = url.split('/');
 
