@@ -1,11 +1,25 @@
-<svelte:options customElement="p-longops-badge" />
+<svelte:options customElement={{ tag: "p-longops-badge", shadow: "none" }} />
 
 <script>
-  import "./initPlugin";
   import { onMount } from "svelte";
 
   let visible = false;
   let currTasks = [];
+
+  onMount(() => {
+    window.hartenfeller_dev = window.hartenfeller_dev || {};
+    window.hartenfeller_dev.plugins = window.hartenfeller_dev.plugins || {};
+    window.hartenfeller_dev.plugins.longops_badge =
+      window.hartenfeller_dev.plugins.longops_badge || {};
+    window.hartenfeller_dev.plugins.longops_badge.status = "loaded";
+
+    window.hartenfeller_dev.plugins.longops_badge.registerTask = (...args) =>
+      registerTask(...args);
+    window.hartenfeller_dev.plugins.longops_badge.updateTask = (...args) =>
+      updateTask(...args);
+    window.hartenfeller_dev.plugins.longops_badge.finishTask = (...args) =>
+      finishTask(...args);
+  });
 
   function logTrace(...args) {
     if (!window?.apex) {
@@ -54,7 +68,7 @@
       }
       return task;
     });
-    setTimeout(removeOldTasks, 10000);
+    setTimeout(removeOldTasks, 5000);
   }
 </script>
 
@@ -62,11 +76,17 @@
   <div class="p-badge">
     <ul class="">
       {#each currTasks as task}
-        <li class="">
+        <li class="u-flex u-align-items-center">
           {#if task.finishedAt}
-            <span aria-hidden="true" class="fa fa-check"></span>
+            <span
+              aria-hidden="true"
+              class="fa fa-check margin-right-sm u-success-text"
+            ></span>
           {:else}
-            <span aria-hidden="true" class="fa fa-spinner fa-anim-spin"></span>
+            <span
+              aria-hidden="true"
+              class="fa fa-refresh fa-anim-spin margin-right-sm"
+            ></span>
           {/if}
           <span>{task.displayName} {task.progress}</span>
         </li>
@@ -81,6 +101,11 @@
     border-radius: 32px;
     border: 1px solid var(--ut-component-border-color);
     box-shadow: var(--ut-shadow-md);
-    font-size: 1.1rem;
+    font-size: 1rem;
+    background: var(--ut-component-background-color);
+
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
   }
 </style>
