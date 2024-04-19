@@ -3,7 +3,12 @@
 <script>
   import { onMount } from "svelte";
 
+  const HIDE_AFTER = 5000;
+
   let visible = false;
+  /**
+   * @type {{displayName: string, progress: string, icon: string, hideAt: number}[]}
+   */
   let currTasks = [];
 
   onMount(() => {
@@ -19,7 +24,13 @@
       updateTask(...args);
     window.hartenfeller_dev.plugins.longops_badge.finishTask = (...args) =>
       finishTask(...args);
+    window.hartenfeller_dev.plugins.longops_badge.showInfo = (...args) =>
+      showInfo(...args);
   });
+
+  function getHideAt() {
+    return Date.now() + HIDE_AFTER - 100;
+  }
 
   function logTrace(...args) {
     if (!window?.apex) {
@@ -30,17 +41,27 @@
 
   function removeOldTasks() {
     // filter tasks that finished 10 seconds ago
-    currTasks = currTasks.filter(
-      (task) => task.finishedAt < Date.now() - 10000,
-    );
+    currTasks = currTasks.filter((task) => task.hideAt > Date.now());
 
     if (currTasks.length === 0) {
       visible = false;
     }
   }
 
+  function deferRemoveOldTasks() {
+    setTimeout(removeOldTasks, HIDE_AFTER);
+  }
+
   export function registerTask(displayName) {
-    currTasks = [...currTasks, { displayName, progress: "", finishedAt: null }];
+    currTasks = [
+      ...currTasks,
+      {
+        displayName,
+        progress: "",
+        finishedAt: null,
+        icon: "fa-refresh fa-anim-spin",
+      },
+    ];
     visible = true;
   }
 
@@ -64,11 +85,30 @@
   export function finishTask(displayName) {
     currTasks = currTasks.map((task) => {
       if (task.displayName === displayName) {
-        return { ...task, progress: "Done", finishedAt: Date.now() };
+        return {
+          ...task,
+          progress: "Done",
+          hideAt: getHideAt(),
+          icon: "fa-check u-success-text",
+        };
       }
       return task;
     });
-    setTimeout(removeOldTasks, 5000);
+    deferRemoveOldTasks();
+  }
+
+  export function showInfo(info) {
+    currTasks = [
+      ...currTasks,
+      {
+        displayName: info,
+        progress: "",
+        hideAt: getHideAt(),
+        icon: "fa-info-circle-o u-info-text",
+      },
+    ];
+    visible = true;
+    deferRemoveOldTasks();
   }
 </script>
 
@@ -77,17 +117,8 @@
     <ul class="">
       {#each currTasks as task}
         <li class="u-flex u-align-items-center">
-          {#if task.finishedAt}
-            <span
-              aria-hidden="true"
-              class="fa fa-check margin-right-sm u-success-text"
-            ></span>
-          {:else}
-            <span
-              aria-hidden="true"
-              class="fa fa-refresh fa-anim-spin margin-right-sm"
-            ></span>
-          {/if}
+          <span aria-hidden="true" class={`fa margin-right-sm ${task.icon}`}
+          ></span>
           <span>{task.displayName} {task.progress}</span>
         </li>
       {/each}

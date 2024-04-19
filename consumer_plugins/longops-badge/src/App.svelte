@@ -8,6 +8,7 @@
 
 	onAPEXready(() => {
 		apexLoaded = true;
+		console.log("Mounting LongopsBadge");
 	});
 
 	async function watiMs(ms) {
@@ -46,14 +47,20 @@
 	}
 
 	onMount(async () => {
-		console.log("LongopsBadge mounted");
 		task1();
 		task2();
 	});
+
+	function showInfo() {
+		window.hartenfeller_dev.plugins.longops_badge.showInfo(
+			`Time: ${new Date().getTime()}`,
+		);
+	}
 </script>
 
 <main style="background: beige;">
 	<APEXenv />
+	<button type="butoon" on:click={showInfo}>Show Info</button>
 	<div style="max-width: 60ch;">
 		<p>
 			Ut elementum mi, a interdum diam. Phasellus egestas ligula turpis, sed

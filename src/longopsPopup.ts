@@ -17,3 +17,7 @@ export function updateLongops(taskId: string, progress: string | number) {
 export function finishLongops(taskId: string) {
 	window.hartenfeller_dev.plugins.longops_badge.finishTask(taskId);
 }
+
+export function longopsInfo(message: string) {
+	window.hartenfeller_dev.plugins.longops_badge.showInfo(message);
+}

@@ -18,7 +18,7 @@ import {
 	WorkerMessageType,
 	YELLOW_CONSOLE,
 } from "./globalConstants";
-import initLongopsPopup from "./longopsPopup";
+import initLongopsPopup, { longopsInfo } from "./longopsPopup";
 import { initMsgBus, sendMsgToWorker } from "./messageBus";
 import initStorageMethods, { setStorageReady } from "./storageMethods";
 import { getLastSync, syncRows } from "./sync";
@@ -675,6 +675,12 @@ if (!window.hartenfeller_dev.plugins.sync_offline_data.sync) {
 }
 
 initLongopsPopup();
+addEventListener("offline", (event) => {
+	longopsInfo("Device is offline");
+});
+addEventListener("online", (event) => {
+	longopsInfo("Device is online");
+});
 
 (() => {
 	setTimeout(() => {

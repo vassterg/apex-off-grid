@@ -203,8 +203,7 @@ async function _clear({ storageId, storageVersion, pkPageItem }) {
 		if (!pageItem) {
 			apex.debug.trace(`Page item '${itemName}' not found!`);
 		} else {
-			// supress changes for clear (3rd argument = true)
-			row[col.colname] = pageItem.setValue("", null, true);
+			row[col.colname] = pageItem.setValue("");
 		}
 	}
 }
