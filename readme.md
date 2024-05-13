@@ -35,6 +35,10 @@ There is a setting in APEX to set these headers. [There currently is a bug](http
 
 [More info on the header requirement](https://sqlite.org/wasm/doc/trunk/persistence.md#:~:text=COOP%20and%20COEP%20HTTP%20Headers).
 
+### Installation
+
+Go to the latest release and download the installation zip file. For the base installation you run the tables and package scripts. Afterwards import the plug-ins.
+
 ### Install sample app
 
 Read the [Installation Guide](./sample-apps/recipes/readme.md)
