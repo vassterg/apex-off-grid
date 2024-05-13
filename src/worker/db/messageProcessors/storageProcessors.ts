@@ -23,10 +23,22 @@ import { removeServerDeletedRows } from '../serverIdsTable';
 import { ColStructure, DbRow } from '../types';
 import { CHANGE_TS_COL, CHANGE_TYPE_COL } from '../userTables';
 
-function prepareSearchTerm(searchTerm: string, colnames: string[]) {
-  const coalescedCols = colnames.map((c) => `coalesce(${c}, '')`).join(' || ');
+function prepareFitlerTerm(colname: string, filter: string) {
+  const bindName = `$${colname}_filter`;
+
   return {
-    where: `where (lower(${coalescedCols}) LIKE $searchTerm) and (__change_type is null or __change_type != 'D')`,
+    bindName,
+    where: `(lower("${colname}") LIKE ${bindName})`,
+    bindVal: `%${filter.replaceAll('%', '/%').toLowerCase()}%`,
+  };
+}
+
+function prepareSearchTerm(searchTerm: string, colnames: string[]) {
+  const coalescedCols = colnames
+    .map((c) => `coalesce("${c}", '')`)
+    .join(' || ');
+  return {
+    where: `(lower(${coalescedCols}) LIKE $searchTerm)`,
     bindVal: `%${searchTerm.replaceAll('%', '/%').toLowerCase()}%`,
   };
 }
@@ -84,19 +96,35 @@ export function getRowByPk(
   }
 }
 
-export function getRows({
+type Binds = { [key: string]: number | string } | undefined;
+enum BuildQueryMode {
+  Rows = 'rows',
+  Count = 'count',
+}
+type BuildQueryModeT = {
+  mode?: BuildQueryMode;
+};
+
+export function buildQuery({
   storageId,
   storageVersion,
   offset,
   maxRows,
   orderByCol,
-  orderByDir = 'asc',
+  orderByDir,
   searchTerm,
-}: GetRowsMsgData): GetRowsResponse {
+  colFilters,
+  colStructure,
+  mode = BuildQueryMode.Rows,
+  whereClause,
+}: GetRowsMsgData & BuildQueryModeT): { sql: string; binds: Binds } {
   const tabname = getTabname({ storageId, storageVersion });
   try {
     let sql = `select * from ${tabname} #WHERE# #ORDER_BY# #LIMIT#`;
-    const colStructure = getStorageColumns(storageId, storageVersion);
+    if (!colStructure) {
+      colStructure = getStorageColumns(storageId, storageVersion);
+    }
+
     const colnames = colStructure.cols.map((c) => c.colname);
 
     if (orderByCol) {
@@ -108,44 +136,123 @@ export function getRows({
       } else {
         const dir = orderByDir.toLowerCase() === 'desc' ? 'desc' : 'asc';
 
-        sql = sql.replace('#ORDER_BY#', `order by ${orderByCol} ${dir}`);
+        sql = sql.replace('#ORDER_BY#', `order by "${orderByCol}" ${dir}`);
       }
     } else {
       sql = sql.replace('#ORDER_BY#', 'order by 1');
     }
 
-    const binds: { [key: string]: number | string } = {
-      $limit: maxRows,
-    };
+    let binds: { [key: string]: number | string } = {};
 
-    if (offset) {
+    if (mode === BuildQueryMode.Count) {
+      sql = sql.replace('#LIMIT#', '');
+    } else if (
+      typeof offset === 'undefined' &&
+      typeof maxRows === 'undefined'
+    ) {
+      sql = sql.replace('#LIMIT#', '');
+    } else if (offset) {
       sql = sql.replace('#LIMIT#', `limit $limit offset $offset`);
+      binds.$limit = maxRows;
       binds.$offset = offset;
     } else {
       sql = sql.replace('#LIMIT#', 'limit $limit');
+      binds.$limit = maxRows;
+    }
+
+    const whereTerms: string[] = [];
+    // always exclude deleted rows
+    whereTerms.push(`(__change_type is null or __change_type != 'D')`);
+
+    if (whereClause) {
+      log.trace('using custom where clause:', whereClause);
+      whereTerms.push(`( ${whereClause} )`);
     }
 
     if (searchTerm) {
       const { where, bindVal } = prepareSearchTerm(searchTerm, colnames);
-      sql = sql.replace('#WHERE#', where);
+      whereTerms.push(where);
       binds.$searchTerm = bindVal;
-    } else {
-      sql = sql.replace(
-        '#WHERE#',
-        `where (__change_type is null or __change_type != 'D')`,
-      );
     }
 
-    log.trace('getRows sql:', sql, binds);
+    if (colFilters && colFilters.length > 0) {
+      colFilters.forEach((f) => {
+        if (!colnames.includes(f.colname.toUpperCase())) {
+          log.warn(
+            `Column "${f.colname.toUpperCase()}" not found. Skipping filter for ${tabname}`,
+          );
+        } else {
+          const { where, bindName, bindVal } = prepareFitlerTerm(
+            f.colname,
+            f.filter,
+          );
 
+          whereTerms.push(where);
+          binds[bindName] = bindVal;
+        }
+      });
+    }
+
+    if (Object.keys(binds).length === 0) {
+      binds = undefined;
+    }
+
+    sql = sql.replace('#WHERE#', `where ${whereTerms.join(' and ')}`);
+
+    log.trace('constructed sql:', sql, binds);
+
+    return { sql, binds };
+  } catch (err) {
+    const msg = `Error building query for ${tabname}: ${err}`;
+    log.error(msg);
+    throw new Error(msg);
+  }
+}
+
+function fetchRowCount(sql: string, binds: Binds): number {
+  try {
+    const countSql = `select count(*) as rowCount from (${sql})`;
+    const data = db.selectObject(countSql, binds) as { rowCount: number };
+    return data.rowCount;
+  } catch (err) {
+    const msg = `Error fetching row count: ${err}`;
+    log.error(msg);
+    throw new Error(msg);
+  }
+}
+
+export function getRows(args: GetRowsMsgData): GetRowsResponse {
+  try {
+    const colStructure = getStorageColumns(args.storageId, args.storageVersion);
+    const { sql, binds } = buildQuery({
+      ...args,
+      colStructure,
+      mode: BuildQueryMode.Rows,
+    });
     const data = db.selectObjects(sql, binds);
+
+    let rowCount: number | undefined;
+
+    if (args.getRowCount) {
+      if (data.length < args.maxRows) {
+        rowCount = data.length;
+      } else {
+        const cntQuery = buildQuery({
+          ...args,
+          colStructure,
+          mode: BuildQueryMode.Count,
+        });
+        rowCount = fetchRowCount(cntQuery.sql, cntQuery.binds);
+      }
+    }
 
     return {
       ok: true,
       rows: data,
+      rowCount,
     };
   } catch (err) {
-    const msg = `Error getting rows for ${tabname}: ${err}`;
+    const msg = `Error getting rows for ${args.storageId} v${args.storageVersion}: ${err}`;
     log.error(msg);
     return {
       ok: false,
@@ -158,35 +265,26 @@ export function getRowCount({
   storageVersion,
   storageId,
   searchTerm,
+  colFilters,
+  whereClause,
 }: GetRowCountMsgData): GetRowCountResponse {
-  const tabname = getTabname({ storageId, storageVersion });
   try {
-    let sql = `select count(*) as rowCount from ${tabname} #WHERE#`;
+    const { sql, binds } = buildQuery({
+      storageId,
+      storageVersion,
+      searchTerm,
+      colFilters,
+      whereClause,
+    });
 
-    const binds: DbRow = {};
-
-    if (searchTerm) {
-      const colStrucure = getStorageColumns(storageId, storageVersion);
-      const colnames = colStrucure.cols.map((c) => c.colname);
-      const { where, bindVal } = prepareSearchTerm(searchTerm, colnames);
-      sql = sql.replace('#WHERE#', where);
-      binds.$searchTerm = bindVal;
-    } else {
-      sql = sql.replace('#WHERE#', '');
-    }
-
-    log.trace('getRowCount sql:', sql, binds);
-    const keyCount = Object.keys(binds).length;
-    const data = db.selectObject(sql, keyCount > 0 ? binds : undefined) as {
-      rowCount: number;
-    };
+    const rowCount = fetchRowCount(sql, binds);
 
     return {
       ok: true,
-      rowCount: data.rowCount,
+      rowCount: rowCount,
     };
   } catch (err) {
-    const msg = `Error getting row count for ${tabname}: ${err}`;
+    const msg = `Error getting row count for ${storageId} v${storageVersion}: ${err}`;
     log.error(msg);
     return {
       ok: false,
@@ -213,7 +311,7 @@ function fixDataTypes({
     if (!row[col.colname] && row[col.colname] !== '0') {
       row[col.colname] = null;
     } else if (col.datatype === 'real') {
-      row[col.colname] = parseFloat(row[col.colname] as string);
+      row[col.colname] = Number.parseFloat(row[col.colname] as string);
     }
   }
 
@@ -264,7 +362,7 @@ export function writeChanges({
         const binds: DbRow = {};
 
         switch (row[CHANGE_TYPE_COL]) {
-          case 'I':
+          case 'I': {
             sql = `
             insert into ${tabname} (
               ${colStructure.cols.map((c) => c.colname).join(',\n')}
@@ -315,8 +413,9 @@ export function writeChanges({
             insStmnt.finalize();
 
             break;
+          }
 
-          case 'U':
+          case 'U': {
             const dbRow = getRowByPk(
               storageId,
               storageVersion,
@@ -333,6 +432,11 @@ export function writeChanges({
                 row,
               );
               continue;
+            }
+
+            //  if row was first inserted and then updated, we need to keep the insert change type
+            if (dbRow.row[CHANGE_TYPE_COL] === 'I') {
+              row[CHANGE_TYPE_COL] = 'I';
             }
 
             sql = `
@@ -366,8 +470,9 @@ export function writeChanges({
             updateStmnt.finalize();
 
             break;
+          }
 
-          case 'D':
+          case 'D': {
             sql = `
             update ${tabname}
             set ${CHANGE_TS_COL} = $${CHANGE_TS_COL}
@@ -392,6 +497,7 @@ export function writeChanges({
               log.error(`Error deleting row (${tabname}):`, err, sql, binds);
             }
             delStmnt.finalize();
+          }
         }
       }
     });

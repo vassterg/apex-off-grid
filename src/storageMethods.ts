@@ -3,13 +3,16 @@ import {
   GetColInfoResponse,
   GetRowByPkResponse,
   GetRowCountResponse,
+  GetRowsArgs,
   GetRowsResponse,
+  RowFilterArgs,
   StorageInfo,
   WorkerMessageType,
 } from './globalConstants';
 import { sendMsgToWorker } from './messageBus';
 import { syncRows } from './sync';
-import { DbRow, OrderByDir } from './worker/db/types';
+import evalPageItems from './util/evalPageItems';
+import { DbRow } from './worker/db/types';
 
 async function _getColInfo(
   storageId: string,
@@ -72,30 +75,40 @@ async function _getRows({
   orderByCol,
   orderByDir,
   searchTerm,
+  colFilters,
+  getRowCount,
+  whereClause,
 }: StorageInfo & {
   apex: any;
-  offset: number;
-  maxRows: number;
-  orderByCol?: string;
-  orderByDir?: OrderByDir;
-  searchTerm?: string;
-}) {
+} & GetRowsArgs) {
+  if (whereClause) {
+    whereClause = evalPageItems(whereClause);
+  }
+
   const { data } = await sendMsgToWorker({
     storageId,
     storageVersion,
     messageType: WorkerMessageType.GetRows,
-    data: { offset, maxRows, orderByCol, orderByDir, searchTerm },
+    data: {
+      offset,
+      maxRows,
+      orderByCol,
+      orderByDir,
+      searchTerm,
+      colFilters,
+      getRowCount,
+      whereClause,
+    },
     expectedMessageType: WorkerMessageType.GetRowsResponse,
   });
 
-  const { ok, error, rows } = data as GetRowsResponse;
+  const { ok, error, rows, rowCount } = data as GetRowsResponse;
 
   if (!ok) {
     apex.debug.error(`Could not get rows: ${error}`);
-    return;
   }
 
-  return rows;
+  return { ok, error, rows, rowCount };
 }
 
 async function _getRowCount({
@@ -103,15 +116,16 @@ async function _getRowCount({
   storageVersion,
   apex,
   searchTerm,
+  colFilters,
+  whereClause,
 }: StorageInfo & {
   apex: any;
-  searchTerm?: string;
-}) {
+} & RowFilterArgs) {
   const { data } = await sendMsgToWorker({
     storageId,
     storageVersion,
     messageType: WorkerMessageType.GetRowCount,
-    data: { searchTerm },
+    data: { searchTerm, colFilters, whereClause },
     expectedMessageType: WorkerMessageType.GetRowCountResponse,
   });
 
@@ -208,13 +222,10 @@ export default function initStorageMethods({
       orderByCol,
       orderByDir,
       searchTerm,
-    }: {
-      offset: number;
-      maxRows?: number;
-      orderByCol?: string;
-      orderByDir?: OrderByDir;
-      searchTerm?: string;
-    }) =>
+      colFilters,
+      getRowCount,
+      whereClause,
+    }: GetRowsArgs) =>
       _getRows({
         storageId,
         storageVersion,
@@ -224,9 +235,19 @@ export default function initStorageMethods({
         orderByCol,
         orderByDir,
         searchTerm,
+        colFilters,
+        getRowCount,
+        whereClause,
       }),
-    getRowCount: ({ searchTerm }: { searchTerm: string }) =>
-      _getRowCount({ storageId, storageVersion, apex, searchTerm }),
+    getRowCount: ({ searchTerm, colFilters, whereClause }: RowFilterArgs) =>
+      _getRowCount({
+        storageId,
+        storageVersion,
+        apex,
+        searchTerm,
+        colFilters,
+        whereClause,
+      }),
     writeChanges: (rows: DbRow[]) =>
       _writeChanges({ storageId, storageVersion, rows, apex }),
     sync: () => _sync({ storageId, storageVersion, apex, pageSize, ajaxId }),

@@ -137,23 +137,36 @@ export type GetRowByPkResponse = {
   row?: DbRow;
 };
 
-export type GetRowsMsgData = BaseRequestData & {
-  offset: number;
+export type ColFilter = { colname: string; filter: string };
+
+export type RowFilterArgs = {
+  searchTerm?: string;
+  colFilters?: ColFilter[];
+  whereClause?: string;
+};
+
+export type GetRowsArgs = {
+  offset?: number;
   maxRows?: number;
   orderByCol?: string;
   orderByDir?: OrderByDir;
-  searchTerm?: string;
-};
+  getRowCount?: boolean;
+  whereClause?: string;
+} & RowFilterArgs;
+
+export type GetRowsMsgData = BaseRequestData &
+  GetRowsArgs & {
+    colStructure?: ColStructure;
+  };
 
 export type GetRowsResponse = {
   ok: boolean;
   error?: string;
   rows?: DbRow[];
+  rowCount?: number;
 };
 
-export type GetRowCountMsgData = BaseRequestData & {
-  searchTerm?: string;
-};
+export type GetRowCountMsgData = BaseRequestData & RowFilterArgs;
 
 export type GetRowCountResponse = {
   ok: boolean;

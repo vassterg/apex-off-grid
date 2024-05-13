@@ -19,7 +19,7 @@ APEX Offline for everyone thanks to a Low Code API with Plug-Ins
 
 ### Prerequisites
 
-- APEX >= 22.1
+- APEX >= 23.2
 - Following HTTP Response Headers are required
 
 ```
@@ -37,43 +37,41 @@ There is a setting in APEX to set these headers. [There currently is a bug](http
 
 ### Install sample app
 
-1. Download ZIP file from the latest release
-2. Install `1-sample-data.sql`, `2-sync-table.sql`, and the packages in `3-packages`
-3. Import `f124-sample-app.sql`
-4. Try it out!
+Read the [Installation Guide](./sample-apps/recipes/readme.md)
 
 ### How to build your own app
 
 1. Import Plug-Ins from release download into your app
 2. [Watch this tutorial video](https://youtu.be/D9aTzsYK7MQ)
 
-x. After you defined your storage, you have define the DML logic in the package `offline_data_sync_api`:
+x. After you defined your storage, you have to define the DML logic in the package `offline_data_sync_api.sync_row`:
 
 ```sql
-case when pi_row.sync_storage_id = 'people' and pi_row.sync_storage_version = 1 then
-  process_people_v1(pi_row, l_success);
+case 
+  when pi_sync_storage_id = 'ingredients' and pi_sync_storage_version = 1 then
 
---
--- add more storages here refer to the example "process_people_v1" to learn how to implement your own logic
---
-
-else
-  raise_application_error(-20001, 'Unhandeled sync_storage_id or sync_storage_version => ' || pi_row.sync_storage_id || ' ' || pi_row.sync_storage_version);
-  return;
-end case;
+	  recipe_offline_sync_api.sync_ingredients_v1 (
+			pi_json                 => l_json
+		, pi_change_type          => l_change_type
+		, pi_change_date          => l_change_date
+		, pi_updated_by           => v('APP_USER')
+		, po_success              => po_success
+		, po_sync_fail_reason     => po_sync_fail_reason
+		, po_sync_device_pk       => po_sync_device_pk
+		, po_snyc_db_pk           => po_snyc_db_pk
+	  );
 ```
 
 ## Caution
 
 - This is a proof of concept
 - There is no warranty or support garantee
-- I am working in my free time on this
+- I am working on this in my free time 
 - I am not responsible for any data loss or damage
 - Only a small fraction of APEX features are supported
-- You can't just make your existing APEX app offline capable with this
-- The users can download the Database and get control over all offline available data
-- The users can manipulate the data in the local database
-- Does not work with current Safari version (16.4, 16.5) (but in previous and hopefully next...) [info about issue](https://sqlite.org/forum/forumpost/4b16f2f465a2433b330d743cf1a3a02b104ed0efff2f368c3d9aa463ec49c97c)
+- You can't just make your existing APEX app offline capable with this. You have to build your app with this in mind.
+- The users could download the Database and get control over all offline available data
+- The users could manipulate the data in the local database with malicious intent
 
 ## Resources
 
