@@ -37,6 +37,8 @@ There is a setting in APEX to set these headers. [There currently is a bug](http
 
 **So you need to set these headers in your Webserver or Proxy.**
 
+- [Here is an example](https://docs.oracle.com/en/database/oracle/oracle-rest-data-services/23.4/ordig/miscellaneous-configuration-options-of-ORDS.html#GUID-A3798C5A-C6C6-40A2-826F-CE1CF0B8DDE2)  on how to it with ORDS standalone (Example 5-3).
+
 [More info on the header requirement](https://sqlite.org/wasm/doc/trunk/persistence.md#:~:text=COOP%20and%20COEP%20HTTP%20Headers).
 
 ### Installation
