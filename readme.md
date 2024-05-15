@@ -26,10 +26,14 @@ APEX Offline for everyone thanks to a Low Code API with Plug-Ins
 Cross-Origin-Embedder-Policy: require-corp
 Cross-Origin-Opener-Policy: same-origin
 ```
+<details>
+  <summary>Current APEX Bug: setting headers in shared components does not work!</summary>
 
 There is a setting in APEX to set these headers. [There currently is a bug](https://twitter.com/chrisneumueller/status/1649367365342093313?s=20) that results in these headers not being set on Plug-In files. So this solution **currently does not work**.
 
 ![App > Shared Components > Security > Browser Security > HTTP Response Headers](./assets/http-headers-apex.png)
+
+</details>
 
 **So you need to set these headers in your Webserver or Proxy.**
 
