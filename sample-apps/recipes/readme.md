@@ -6,4 +6,5 @@ Installation
 - Run `2-sample-data.sql`
 - Run `3-recipe-offline_sync_api.pks`
 - Run `4-recipe-offline_sync_api.pkb`
-- Import app `5-f100.sql`
+- Run `5-recipe-offline_sync_api.pkb`
+- Import app `6-f100.sql`
